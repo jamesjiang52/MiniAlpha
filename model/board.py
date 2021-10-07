@@ -47,7 +47,6 @@ class Board:
         features.append(np.reshape(np.fromiter(bin(self.total_move_count)[2:].zfill(rules.NUM_SQUARES), dtype=int), (rules.BOARD_SIDE_LENGTH, rules.BOARD_SIDE_LENGTH)))
         features.append(np.reshape(np.fromiter(bin(self.no_progress_move_count)[2:].zfill(rules.NUM_SQUARES), dtype=int), (rules.BOARD_SIDE_LENGTH, rules.BOARD_SIDE_LENGTH)))
 
-        print(np.array(features).shape)
         return np.array(features)
 
 
