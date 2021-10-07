@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import tensorflow as tf
 
@@ -18,8 +20,9 @@ except RuntimeError as e:
 
 
 class NeuralNetwork(Model):
-    def __init__(self):
+    def __init__(self, config_path):
         super(NeuralNetwork, self).__init__()
+        self.cfg = nn_cfg.load_cfg(config_path)
 
         self._conv_block_init()
         self._residual_tower_init()
@@ -62,9 +65,9 @@ class NeuralNetwork(Model):
 
     def _conv_block_init(self):
         self.conv1 = Conv2D(
-            filters=nn_cfg.NUM_FILTERS,
-            kernel_size=nn_cfg.KERNEL_SIZE,
-            strides=nn_cfg.STRIDE,
+            filters=self.cfg.NUM_FILTERS,
+            kernel_size=self.cfg.KERNEL_SIZE,
+            strides=self.cfg.STRIDE,
             data_format="channels_first",
             padding="same",
         )
@@ -72,19 +75,19 @@ class NeuralNetwork(Model):
 
     def _residual_tower_init(self):
         self.residual_blocks = []
-        for _ in range(nn_cfg.NUM_RES_BLOCKS):
+        for _ in range(self.cfg.NUM_RES_BLOCKS):
             conv1 = Conv2D(
-                filters=nn_cfg.NUM_FILTERS,
-                kernel_size=nn_cfg.KERNEL_SIZE,
-                strides=nn_cfg.STRIDE,
+                filters=self.cfg.NUM_FILTERS,
+                kernel_size=self.cfg.KERNEL_SIZE,
+                strides=self.cfg.STRIDE,
                 data_format="channels_first",
                 padding="same",
             )
             bn1 = BatchNormalization(axis=1)
             conv2 = Conv2D(
-                filters=nn_cfg.NUM_FILTERS,
-                kernel_size=nn_cfg.KERNEL_SIZE,
-                strides=nn_cfg.STRIDE,
+                filters=self.cfg.NUM_FILTERS,
+                kernel_size=self.cfg.KERNEL_SIZE,
+                strides=self.cfg.STRIDE,
                 data_format="channels_first",
                 padding="same"
             )
@@ -93,39 +96,45 @@ class NeuralNetwork(Model):
 
     def _policy_head_init(self):
         self.conv_policy = Conv2D(
-            filters=nn_cfg.NUM_FILTERS_POLICY,
-            kernel_size=nn_cfg.KERNEL_SIZE_POLICY,
-            strides=nn_cfg.STRIDE,
+            filters=self.cfg.NUM_FILTERS_POLICY,
+            kernel_size=self.cfg.KERNEL_SIZE_POLICY,
+            strides=self.cfg.STRIDE,
             data_format="channels_first",
             padding="same",
         )
         self.bn_policy = BatchNormalization(axis=1)
         self.fc_policy = Dense(
-            nn_cfg.NUM_POLICY_DENSE_LAYER_OUTPUT,
+            rules.NUM_MOVES * rules.NUM_SQUARES,
             name="policy_head"
         )
 
     def _value_head_init(self):
         self.conv_value = Conv2D(
-            filters=nn_cfg.NUM_FILTERS_HEAD,
-            kernel_size=nn_cfg.KERNEL_SIZE_HEAD,
-            strides=nn_cfg.STRIDE,
+            filters=self.cfg.NUM_FILTERS_HEAD,
+            kernel_size=self.cfg.KERNEL_SIZE_HEAD,
+            strides=self.cfg.STRIDE,
             data_format="channels_first",
             padding="same",
         )
         self.bn_value = BatchNormalization(axis=1)
         self.fc1_value = Dense(
-            nn_cfg.NUM_HEAD_DENSE_LAYER_OUTPUT_1,
+            self.cfg.NUM_HEAD_DENSE_LAYER_OUTPUT_1,
             activation="relu"
         )
         self.fc2_value = Dense(
-            nn_cfg.NUM_HEAD_DENSE_LAYER_OUTPUT_2,
+            self.cfg.NUM_HEAD_DENSE_LAYER_OUTPUT_2,
             activation="tanh",
             name="value_head"
         )
 
 
-if __name__ == "__main__":
-    nn = NeuralNetwork()
+def main():
+    cfg_path = os.path.join(os.path.dirname(__file__), 'configs', 'default.yaml')
+
+    nn = NeuralNetwork(cfg_path)
     board = Board()
     print(nn.predict_board(board))
+
+
+if __name__ == "__main__":
+    main()
