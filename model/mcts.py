@@ -1,13 +1,12 @@
+import copy
+import heapq
+from typing import Tuple
+from dataclasses import dataclass
+
 import numpy as np
 
-
-# replace these two classes with the actual implementations
-class Board:
-    pass
-
-
-class Model:
-    pass
+from board import Board
+from nn import NeuralNetwork
 
 
 # declaration for typing
@@ -15,27 +14,27 @@ class Node:
     pass
 
 
+@dataclass
 class Edge:
-
-    def __init__(self, p: float, action: int, parent_node: Node):
-        """
-        Edge class for the MCTS
-        :param p: prior probability of selecting this edge
-        :param action: the index of the action this edge represents
-        :param parent_node: the (unique) node with this edge as its child
-        """
-        self.n = 0
-        self.w = 0
-        self.q = 0
-        self.p = p
-        self.action = action
-        self.parent = parent_node
-        self.child = None
+    """
+    Edge class for the MCTS
+    :param p: prior probability of selecting this edge
+    :param action: the index of the action this edge represents
+    :param parent_node: the (unique) node with this edge as its child
+    """
+    p: float
+    action: int
+    parent: Node
+    n: int = 0
+    w: float = 0
+    q: float = 0
+    child: Node = None
+    is_terminal: bool = False
 
 
 class Node:
 
-    def __init__(self, board: Board, model: Model):
+    def __init__(self, board: Board, model: NeuralNetwork):
         """
         Node class for the MCTS
         :param board: the board with the current position at this node
@@ -56,7 +55,7 @@ class Node:
             to take
         :return: None
         """
-        value, action_probs = self.model.evaluate(self.board)
+        action_probs, value = self.model.predict_board(self.board)
         self.children = [Edge(prob, i, self) for i, prob in enumerate(action_probs)]
         self.value = value
 
@@ -70,14 +69,12 @@ class Node:
                       exploitation for more exploration
         :return: the edge to explore next
         """
-        best_value = -1
-        best_edge = None
-        for edge in self.children:
-            edge_value = edge.q + cpuct * edge.p * np.sqrt(self.n_visits) / (1 + edge.n)
-            if edge_value > best_value:
-                best_value = edge_value
-                best_edge = edge
-        return edge
+        qs = np.array([edge.q for edge in self.children])
+        ps = np.array([edge.p for edge in self.children])
+        ns = np.array([edge.n for edge in self.children])
+
+        best_index = np.argmax(qs + cpuct * ps * np.sqrt(self.n_visits) / (1 + ns))
+        return self.children[best_index]
 
     def playout(self, cpuct: float = 0.1) -> None:
         """
@@ -93,28 +90,63 @@ class Node:
         # selection phase
         curr_node = self
         while True:
-            edge = choose_child_to_explore(cpuct)
+            edge = curr_node.choose_child_to_explore(cpuct)
             if edge.child is None:
                 break
             else:
                 curr_node = edge.child
 
         # expansion phase
-        new_board = self.board.update(edge.action)
-        new_node = Node(new_board, self.model)
-        new_node.parent_edge = edge
-        new_node.init_children()
-        edge.child = new_node
+        if curr_node.parent_edge is not None and curr_node.parent_edge.is_terminal:
+            # don't keep exploring if the game has already ended
+            edge = curr_node.parent_edge
+            new_node = curr_node
+        else:
+            new_board = copy.deepcopy(curr_node.board)
+            return_code = new_board.move(edge.action)
+            new_node = Node(new_board, self.model)
+            new_node.parent_edge = edge
+            new_node.init_children()
+            edge.child = new_node
+
+            # if the new board is the end of a game, mark the edge as terminal
+            if return_code != 2:
+                edge.is_terminal = True
 
         # backup phase
         curr_edge = edge
         value = new_node.value
         while True:
-            edge.n += 1
-            edge.w += value
-            edge.q = edge.w / edge.n
-            edge.parent.n_visits += 1
+            curr_edge.n += 1
+            curr_edge.w += value
+            curr_edge.q = curr_edge.w / curr_edge.n
+            curr_edge.parent.n_visits += 1
 
-            curr_edge = edge.parent.parent_edge
+            curr_edge = curr_edge.parent.parent_edge
             if curr_edge is None:
                 break
+
+    def select_move(self, temp: float = 1) -> Tuple[int, np.ndarray, Node]:
+        """
+        Select a move to play based on the previous playouts;
+            the move is probabilistic and based on the number of
+            node visits in the MCTS tree.
+        :param temp: Temperature parameter; a higher temperature favours
+                     more exploration, and a temperature of zero means
+                     no exploration (select the best move)
+        :return: a tuple containing the move to play, the move probabilities,
+                 and the subtree rooted at the next board position
+        """
+        if temp == 0:
+            # deterministically select the node with the highest visit count
+            move = np.argmax([edge.n for edge in self.children])
+            policy = np.zeros(len(self.children))
+            policy[move] = 1
+        else:
+            # probabilistically select a move in rough proportion to its
+            # visit count
+            policy = np.array([np.power(edge.n, 1 / temp) for edge in self.children])
+            policy = policy / np.sum(policy)
+            move = np.random.choice(np.arange(policy.shape[0]), p=policy)
+
+        return move, policy, self.children[move].child
