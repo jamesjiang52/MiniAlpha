@@ -44,8 +44,8 @@ class Board:
             features.append(np.array([[self.second_repetition_history[t], 1 - self.second_repetition_history[t], 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]))
 
         features.append(np.array([[self.color, 1 - self.color, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]))
-        features.append(np.reshape(np.fromiter(bin(self.total_move_count)[2:].zfill(rules.NUM_SQUARES), dtype=int), (rules.BOARD_SIDE_LENGTH, rules.BOARD_SIDE_LENGTH)))
-        features.append(np.reshape(np.fromiter(bin(self.no_progress_move_count)[2:].zfill(rules.NUM_SQUARES), dtype=int), (rules.BOARD_SIDE_LENGTH, rules.BOARD_SIDE_LENGTH)))
+        features.append(np.full((5, 5), self.total_move_count))
+        features.append(np.full((5, 5), self.no_progress_move_count))
 
         return np.array(features)
 
