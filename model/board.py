@@ -46,7 +46,7 @@ class Board:
         features.append(np.full((5, 5), self.total_move_count))
         features.append(np.full((5, 5), self.no_progress_move_count))
 
-        return np.array(features)
+        return np.array(features).astype(np.float32)
 
     def pprint(self):
         """

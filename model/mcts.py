@@ -1,5 +1,4 @@
 import copy
-import heapq
 from typing import Tuple
 from dataclasses import dataclass
 
@@ -38,14 +37,23 @@ class Node:
         """
         Node class for the MCTS
         :param board: the board with the current position at this node
-        :param model: the model used for evaluation
+        :param model: the model for position evaluation
         """
         self.board = board
         self.model = model
+
         self.parent_edge = None
         self.children = []
         self.value = None
         self.n_visits = 0
+
+    @staticmethod
+    def softmax(x: np.ndarray):
+        """
+        Compute softmax activation of x
+        """
+        e_x = np.exp(x - np.max(x))
+        return e_x / e_x.sum()
 
     def init_children(self) -> None:
         """
@@ -55,7 +63,14 @@ class Node:
             to take
         :return: None
         """
+        # self.in_queue.put(self.board.get_input_features().transpose(1, 2, 0))
+        # action_probs, value = self.out_queue.get()
+
         action_probs, value = self.model.predict_board(self.board)
+
+        # convert logit activations to probabilities
+        action_probs = self.softmax(action_probs)
+
         self.children = [Edge(prob, i, self) for i, prob in enumerate(action_probs)]
         self.value = value
 

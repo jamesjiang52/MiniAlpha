@@ -1,7 +1,7 @@
 import yaml
 
 
-class NNConfig:
+class Config:
     """
     Convenience class so we don't have to index a dictionary
     """
@@ -17,4 +17,4 @@ def load_cfg(path):
     Load a config from the specified path
     """
     with open(path, 'r') as f:
-        return NNConfig(yaml.safe_load(f))
+        return Config(yaml.safe_load(f))

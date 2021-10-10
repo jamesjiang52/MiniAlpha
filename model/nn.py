@@ -8,7 +8,6 @@ from tensorflow.keras.layers import Dense, Conv2D, BatchNormalization
 
 import rules
 from board import Board
-import nn_cfg
 
 
 gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -20,9 +19,9 @@ except RuntimeError as e:
 
 
 class NeuralNetwork(Model):
-    def __init__(self, config_path):
+    def __init__(self, cfg):
         super(NeuralNetwork, self).__init__()
-        self.cfg = nn_cfg.load_cfg(config_path)
+        self.cfg = cfg
 
         self._conv_block_init()
         self._residual_tower_init()
@@ -61,7 +60,7 @@ class NeuralNetwork(Model):
         return x_policy, x_value
 
     def predict_board(self, board):
-        x = np.array([board.get_input_features()], dtype=np.float32).transpose(0, 2, 3, 1)
+        x = np.array([board.get_input_features()]).transpose(0, 2, 3, 1)
         policy, value = self(x, training=False)
         return tf.squeeze(policy).numpy(), tf.squeeze(value).numpy()
 
