@@ -129,6 +129,7 @@ def train():
 
     model = NeuralNetwork(cfg)
     optimizer = optimizers.Adam(learning_rate=1e-3)
+    # optimizer = optimizers.SGD(learning_rate=0.001)
 
     @tf.function(jit_compile=True)
     def train_step(x, true_policy, true_value, step):
@@ -178,7 +179,21 @@ def train():
         agent_num += 1
 
 
+def profile_fn():
+    cfg_path = os.path.join(os.path.dirname(__file__), 'configs', 'default.yaml')
+    cfg = load_cfg(cfg_path)
+
+    model = NeuralNetwork(cfg)
+    generate_game(model, num_playouts=1600, cpuct=1)
+
+
+def profile():
+    import cProfile
+    cProfile.run('profile_fn()', sort='time')
+
+
 def main():
+    # profile()
     train()
 
 

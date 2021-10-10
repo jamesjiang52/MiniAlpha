@@ -28,6 +28,7 @@ class NeuralNetwork(Model):
         self._policy_head_init()
         self._value_head_init()
 
+    @tf.function(jit_compile=True)
     def call(self, x, training=False):
         batch_size = x.shape[0]
 
