@@ -40,10 +40,10 @@ class Board:
         features = []
         for t in range(rules.HISTORY_LENGTH):
             features.extend(self.history[t])
-            features.append(np.array([[self.first_repetition_history[t], 1 - self.first_repetition_history[t], 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]))
-            features.append(np.array([[self.second_repetition_history[t], 1 - self.second_repetition_history[t], 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]))
+            features.append(np.full((rules.BOARD_SIDE_LENGTH, rules.BOARD_SIDE_LENGTH), self.first_repetition_history[t]))
+            features.append(np.full((rules.BOARD_SIDE_LENGTH, rules.BOARD_SIDE_LENGTH), self.second_repetition_history[t]))
 
-        features.append(np.array([[self.color, 1 - self.color, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]))
+        features.append(np.full((rules.BOARD_SIDE_LENGTH, rules.BOARD_SIDE_LENGTH), self.color))
         features.append(np.full((rules.BOARD_SIDE_LENGTH, rules.BOARD_SIDE_LENGTH), self.total_move_count))
         features.append(np.full((rules.BOARD_SIDE_LENGTH, rules.BOARD_SIDE_LENGTH), self.no_progress_move_count))
 
