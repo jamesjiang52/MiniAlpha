@@ -30,7 +30,6 @@ class Board:
         self.first_repetition_history = [0]*rules.HISTORY_LENGTH
         self.second_repetition_history = [0]*rules.HISTORY_LENGTH
 
-
     def get_input_features(self):
         """
         Returns a numpy array with shape (83, 5, 5).
@@ -48,8 +47,7 @@ class Board:
         features.append(np.full((rules.BOARD_SIDE_LENGTH, rules.BOARD_SIDE_LENGTH), self.total_move_count))
         features.append(np.full((rules.BOARD_SIDE_LENGTH, rules.BOARD_SIDE_LENGTH), self.no_progress_move_count))
 
-        return np.array(features)
-
+        return np.array(features).astype(np.float32)
 
     def pprint(self):
         """
@@ -113,7 +111,6 @@ class Board:
             print("|    |    |    |    |    |")
             print("| {} | {} | {} | {} | {} |".format(*position[4][::-1]))
             print("|____|____|____|____|____|")
-
 
     def _get_attacking_squares(self, piece_idx, opposite=0, by_piece=0):
         if by_piece:
@@ -185,7 +182,6 @@ class Board:
 
         return attacking_squares
 
-
     def _get_pseudolegal_squares(self, piece_idx, opposite=0):
         pseudolegal_squares = self._get_attacking_squares(piece_idx, opposite=opposite)
         if opposite:
@@ -196,7 +192,6 @@ class Board:
                 pseudolegal_squares = (pseudolegal_squares ^ self.pieces[i]) & pseudolegal_squares
 
         return pseudolegal_squares
-
 
     def move(self, move):
         """
@@ -541,6 +536,24 @@ class Board:
         # source square has no piece or piece of opposite color
         return -1
 
+    def __deepcopy__(self, memo):
+        """
+        Allow deep-copying
+        """
+        cls = self.__class__
+        new = cls.__new__(cls)
+
+        new.pieces = np.copy(self.pieces)
+        new.color = self.color
+        new.total_move_count = self.total_move_count
+        new.first_repetition = self.first_repetition
+        new.second_repetition = self.second_repetition
+        new.no_progress_move_count = self.no_progress_move_count
+        new.history = np.copy(self.history)
+        new.first_repetition_history = self.first_repetition_history[:]
+        new.second_repetition_history = self.second_repetition_history[:]
+
+        return new
 
 
 if __name__ == "__main__":
