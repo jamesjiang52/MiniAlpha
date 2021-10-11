@@ -1,4 +1,5 @@
 import sys
+import copy
 import numpy as np
 import rules
 
@@ -6,7 +7,7 @@ import rules
 class Board:
     def __init__(self):
         # starting position
-        self.pieces = rules.start_position
+        self.pieces = copy.deepcopy(rules.start_position)
 
         # current color to move
         # set 0 for white, 1 for black
@@ -43,8 +44,8 @@ class Board:
             features.append(np.array([[self.second_repetition_history[t], 1 - self.second_repetition_history[t], 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]))
 
         features.append(np.array([[self.color, 1 - self.color, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]))
-        features.append(np.full((5, 5), self.total_move_count))
-        features.append(np.full((5, 5), self.no_progress_move_count))
+        features.append(np.full((rules.BOARD_SIDE_LENGTH, rules.BOARD_SIDE_LENGTH), self.total_move_count))
+        features.append(np.full((rules.BOARD_SIDE_LENGTH, rules.BOARD_SIDE_LENGTH), self.no_progress_move_count))
 
         return np.array(features).astype(np.float32)
 
@@ -111,8 +112,12 @@ class Board:
             print("| {} | {} | {} | {} | {} |".format(*position[4][::-1]))
             print("|____|____|____|____|____|")
 
-    def _get_attacking_squares(self, piece_idx, opposite=0):
-        attacking_squares = np.zeros((rules.BOARD_SIDE_LENGTH, rules.BOARD_SIDE_LENGTH), int)
+    def _get_attacking_squares(self, piece_idx, opposite=0, by_piece=0):
+        if by_piece:
+            attacking_squares = []
+            piece_squares = []
+        else:
+            attacking_squares = np.zeros((rules.BOARD_SIDE_LENGTH, rules.BOARD_SIDE_LENGTH), int)
 
         # get all squares of piece
         square = np.nonzero(self.pieces[piece_idx])
@@ -120,9 +125,17 @@ class Board:
 
         for i in range(len(square_rows)):
             if not opposite:  # squares being attacked by color
-                attacking_squares = attacking_squares | rules.attack_squares_p1[piece_idx][square_rows[i]][square_cols[i]]
+                if by_piece:
+                    attacking_squares.append(rules.attack_squares_p1[piece_idx][square_rows[i]][square_cols[i]])
+                    piece_squares.append((square_rows[i], square_cols[i]))
+                else:
+                    attacking_squares = attacking_squares | rules.attack_squares_p1[piece_idx][square_rows[i]][square_cols[i]]
             else:  # squares being attacked by opposite color
-                attacking_squares = attacking_squares | rules.attack_squares_p2[piece_idx - rules.NUM_PIECE_TYPES_PER_COLOR][square_rows[i]][square_cols[i]]
+                if by_piece:
+                    attacking_squares.append(rules.attack_squares_p2[piece_idx - rules.NUM_PIECE_TYPES_PER_COLOR][square_rows[i]][square_cols[i]])
+                    piece_squares.append((square_rows[i], square_cols[i]))
+                else:
+                    attacking_squares = attacking_squares | rules.attack_squares_p2[piece_idx - rules.NUM_PIECE_TYPES_PER_COLOR][square_rows[i]][square_cols[i]]
 
             # account for pieces blocking bishops
             # TODO: find a way to avoid doing this since this is slow
@@ -134,19 +147,38 @@ class Board:
                         continue
 
                     dest_row, dest_col = dest[0][0], dest[1][0]
-                    if attacking_squares[dest_row][dest_col]:  # move results in piece landing on the square being attacked
-                        # check if piece is blocking
-                        move_passthru_vec = rules.move_passthrus[move_index][square_rows[i]][square_cols[i]]
-                        for j in range(rules.NUM_PIECE_TYPES_TOTAL):
-                            # king doesn't actually "block" a bishop's attack
-                            if opposite and j == rules.P1_KING_IDX:
-                                continue
-                            elif j == rules.P2_KING_IDX:
-                                continue
+                    
+                    if by_piece:
+                        if attacking_squares[i][dest_row][dest_col]:  # move results in piece landing on the square being attacked
+                            # check if piece is blocking
+                            move_passthru_vec = rules.move_passthrus[move_index][square_rows[i]][square_cols[i]]
+                            for j in range(rules.NUM_PIECE_TYPES_TOTAL):
+                                # king doesn't actually "block" a bishop's attack
+                                if opposite and j == rules.P1_KING_IDX:
+                                    continue
+                                elif j == rules.P2_KING_IDX:
+                                    continue
+    
+                                if (self.pieces[j] & move_passthru_vec).any():  # piece is blocking
+                                    attacking_squares[i][dest_row][dest_col] = 0
+                                    break
+                    else:
+                        if attacking_squares[dest_row][dest_col]:  # move results in piece landing on the square being attacked
+                            # check if piece is blocking
+                            move_passthru_vec = rules.move_passthrus[move_index][square_rows[i]][square_cols[i]]
+                            for j in range(rules.NUM_PIECE_TYPES_TOTAL):
+                                # king doesn't actually "block" a bishop's attack
+                                if opposite and j == rules.P1_KING_IDX:
+                                    continue
+                                elif j == rules.P2_KING_IDX:
+                                    continue
+    
+                                if (self.pieces[j] & move_passthru_vec).any():  # piece is blocking
+                                    attacking_squares[dest_row][dest_col] = 0
+                                    break
 
-                            if (self.pieces[j] & move_passthru_vec).any():  # piece is blocking
-                                attacking_squares[dest_row][dest_col] = 0
-                                break
+        if by_piece:
+            return attacking_squares, piece_squares
 
         return attacking_squares
 
@@ -364,22 +396,89 @@ class Board:
                 ###############################
 
                 # check if checkmate
-                attacking_squares = np.zeros((rules.BOARD_SIDE_LENGTH, rules.BOARD_SIDE_LENGTH), int)
+                attacking_squares_by_piece = []
+                attacking_piece_squares = []
+                attacking_piece_idxs = []
                 for j in range(rules.NUM_PIECE_TYPES_PER_COLOR):
-                    attacking_squares = attacking_squares | self._get_attacking_squares(j)
+                    piece_attacking_squares, piece_squares = self._get_attacking_squares(j, by_piece=1)
+                    attacking_squares_by_piece.extend(piece_attacking_squares)
+                    attacking_piece_squares.extend(piece_squares)
+                    attacking_piece_idxs.extend([j]*len(piece_squares))
+                    
+                attacking_squares = np.zeros((rules.BOARD_SIDE_LENGTH, rules.BOARD_SIDE_LENGTH), int)
+                for squares in attacking_squares_by_piece:
+                    attacking_squares = attacking_squares | squares
 
+                opposite_king_square = np.nonzero(self.pieces[rules.P2_KING_IDX])
+                opposite_king_row, opposite_king_col = opposite_king_square[0][0], opposite_king_square[1][0]
+                
                 opposite_king_squares = self._get_pseudolegal_squares(rules.P2_KING_IDX, opposite=1)
                 free_squares = (opposite_king_squares ^ attacking_squares) & opposite_king_squares
 
-                if (attacking_squares & self.pieces[rules.P2_KING_IDX]).any():  # opposite king in check
-                    if not free_squares.any():
-                        return 1
+                found_move = 0
+                if attacking_squares[opposite_king_row][opposite_king_col]:  # opposite king in check
+                    if free_squares.any():  # king has legal move
+                        found_move = 1
+                    else:
+                        # get pieces checking king
+                        check_piece_squares = []
+                        check_piece_idxs = []
+                        for j in range(len(attacking_squares_by_piece)):
+                            if (attacking_squares_by_piece[j] & self.pieces[rules.P2_KING_IDX]).any():
+                                check_piece_squares.append(attacking_piece_squares[j])
+                                check_piece_idxs.append(attacking_piece_idxs[j])
+                                
+                        if len(check_piece_squares) > 1:  # double check (can't capture or block)
+                            return 1
+                            
+                        check_piece_row, check_piece_col = check_piece_squares[0]
+                        check_piece_idx = check_piece_idxs[0]
+                    
+                        # check if piece can capture
+                        for j in range(rules.NUM_PIECE_TYPES_PER_COLOR, rules.NUM_PIECE_TYPES_TOTAL):
+                            if j == rules.P2_KING_IDX:
+                                # check if checking piece is defended
+                                if not attacking_squares[check_piece_row][check_piece_col]:
+                                    found_move = 1
+                                    break
+                            else:
+                                if self._get_attacking_squares(j, opposite=1)[check_piece_row][check_piece_col]:
+                                    found_move = 1
+                                    break
+                                    
+                        # check if piece can block
+                        if check_piece_idx == rules.P1_BISHOP_IDX:
+                            diagonal_move_indices = [5, 6, 7, 9, 10, 11, 13, 14, 15, 17, 18, 19]
+                            for move_idx in diagonal_move_indices:
+                                dest = np.nonzero(rules.move_dests[move_idx][check_piece_row][check_piece_col])
+                                if not dest[0].size:
+                                    continue
+                                    
+                                dest_row, dest_col = dest[0][0], dest[1][0]
+                                if dest_row == opposite_king_row and dest_col == opposite_king_col:
+                                    move_passthru_vec = rules.move_passthrus[move_idx][check_piece_row][check_piece_col]
+                                else:
+                                    continue
+                        
+                                for j in range(rules.NUM_PIECE_TYPES_PER_COLOR, rules.NUM_PIECE_TYPES_TOTAL):
+                                    if j == rules.P2_KING_IDX:
+                                        continue
+                                    if (self._get_attacking_squares(j, opposite=1) & move_passthru_vec).any():
+                                        found_move = 1
+                                        break
+                                if found_move:
+                                    break
+                else:
+                    found_move = 1
+
+                if not found_move:
+                    return 1
 
                 # check if stalemate
                 found_move = 0
                 for j in range(rules.NUM_PIECE_TYPES_PER_COLOR, rules.NUM_PIECE_TYPES_TOTAL):
                     if j == rules.P2_KING_IDX:
-                        if not (attacking_squares & self.pieces[rules.P2_KING_IDX]).any():  # opposite king not in check
+                        if not attacking_squares[opposite_king_row][opposite_king_col]:  # opposite king not in check
                             if free_squares.any():
                                 found_move = 1
                                 break
@@ -464,7 +563,16 @@ if __name__ == "__main__":
     board.pprint()
 
     moves = [6, 207, 9]
+    legal_moves = []
 
     for move in moves:
         board.move(move)
         board.pprint()
+
+    for action in range(850):
+        board = Board()
+        return_code = board.move(action)
+        if return_code == 2:
+            legal_moves.append(action)
+            
+    print(legal_moves)
