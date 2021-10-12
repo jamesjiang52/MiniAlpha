@@ -373,7 +373,7 @@ class Board:
 
                 # check if king is in check after move
                 for j in range(rules.NUM_PIECE_TYPES_PER_COLOR, rules.NUM_PIECE_TYPES_TOTAL):
-                    if (self._get_attacking_squares(j, opposite=1)[square_dest_row][square_dest_col] & self.pieces[rules.P1_KING_IDX]).any():
+                    if (self._get_attacking_squares(j, opposite=1) & self.pieces[rules.P1_KING_IDX]).any():
                         return -1
 
 
@@ -562,7 +562,7 @@ if __name__ == "__main__":
     board.pprint()
 
     #moves = [6, 207, 9]
-    moves = [529, 528]
+    moves = [529, 538]
     legal_moves = []
 
     for move in moves:
