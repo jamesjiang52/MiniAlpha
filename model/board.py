@@ -372,10 +372,9 @@ class Board:
                 #########################################
 
                 # check if king is in check after move
-                if i == rules.P1_KING_IDX:
-                    for j in range(rules.NUM_PIECE_TYPES_PER_COLOR, rules.NUM_PIECE_TYPES_TOTAL):
-                        if self._get_attacking_squares(j, opposite=1)[square_dest_row][square_dest_col]:
-                            return -1
+                for j in range(rules.NUM_PIECE_TYPES_PER_COLOR, rules.NUM_PIECE_TYPES_TOTAL):
+                    if (self._get_attacking_squares(j, opposite=1)[square_dest_row][square_dest_col] & self.pieces[rules.P1_KING_IDX]).any():
+                        return -1
 
 
                 ####################################
@@ -562,13 +561,15 @@ if __name__ == "__main__":
     board = Board()
     board.pprint()
 
-    moves = [6, 207, 9]
+    #moves = [6, 207, 9]
+    moves = [529, 528]
     legal_moves = []
 
     for move in moves:
-        board.move(move)
+        print(board.move(move))
         board.pprint()
 
+    """
     for action in range(850):
         board = Board()
         return_code = board.move(action)
@@ -576,3 +577,4 @@ if __name__ == "__main__":
             legal_moves.append(action)
             
     print(legal_moves)
+    """
