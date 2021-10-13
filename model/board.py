@@ -330,6 +330,11 @@ class Board:
                     elif not rules.pawn_move_legality[move_index][square_row][square_col]:
                         return -1
 
+                    # check if same color piece occupies forward square
+                    for j in range(rules.NUM_PIECE_TYPES_PER_COLOR):
+                        if self.pieces[j][square_dest_row][square_dest_col]:
+                            return -1
+
                 # check if same color piece occupies destination square (illegal move)
                 # check if bishop move is blocked by another piece
                 else:
@@ -561,8 +566,7 @@ if __name__ == "__main__":
     board = Board()
     board.pprint()
 
-    #moves = [6, 207, 9]
-    moves = [529, 538]
+    moves = [9, 9, 6, 106, 7, 210, 576, 207, 12, 5, 203, 8, 77, 13, 109, 101, 203, 202, 34]
     legal_moves = []
 
     for move in moves:
