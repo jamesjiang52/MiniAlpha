@@ -25,6 +25,7 @@ class Board:
 
         # history of moves
         self.history = np.append(np.zeros((rules.HISTORY_LENGTH - 1, rules.NUM_PIECE_TYPES_TOTAL, rules.BOARD_SIDE_LENGTH, rules.BOARD_SIDE_LENGTH), int), [self.pieces], axis=0)
+        self.history_last = set()
 
         # repetition history
         self.first_repetition_history = [0]*rules.HISTORY_LENGTH
@@ -495,8 +496,8 @@ class Board:
                     return 0
 
                 # check repetitions
-                for t in range(rules.HISTORY_LENGTH):
-                    if np.equal(self.history[t], self.pieces).all():
+                if not pawn and not capture:
+                    if self.pieces.tobytes() in self.history_last:
                         if self.second_repetition:  # draw
                             return 0
                         elif self.first_repetition:
@@ -504,7 +505,26 @@ class Board:
                             self.second_repetition = 1
                         else:
                             self.first_repetition = 1
-                        break
+                            self.second_repetition = 0
+                    else:
+                        self.history_last.add(self.pieces.tobytes())
+                        self.first_repetition = 0
+                        self.second_repetition = 0
+                else:
+                    self.history_last = set()
+                    self.first_repetition = 0
+                    self.second_repetition = 0
+                
+                #for t in range(rules.HISTORY_LENGTH):
+                #    if np.equal(self.history[t], self.pieces).all():
+                #        if self.second_repetition:  # draw
+                #            return 0
+                #        elif self.first_repetition:
+                #            self.first_repetition = 0
+                #            self.second_repetition = 1
+                #        else:
+                #            self.first_repetition = 1
+                #        break
 
                 # check if 50-move rule
                 if self.no_progress_move_count >= rules.NO_PROGRESS_MOVES_LIM:
